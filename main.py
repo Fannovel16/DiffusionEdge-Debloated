@@ -180,3 +180,7 @@ def slide_sample(model, inputs, crop_size, stride, mask=None, bs=8):
         assert (count_mat == 0).sum() == 0
         seg_logits = preds / count_mat
         return seg_logits
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
