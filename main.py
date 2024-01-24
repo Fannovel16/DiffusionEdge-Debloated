@@ -87,8 +87,8 @@ def main(args):
         use_l1=model_cfg.get('use_l1', True),
         cfg=model_cfg,
     )
-    args.ckpt_path = args.pre_weight
-    args.batch_size = args.bs
+    cfg.sampler.ckpt_path = args.pre_weight
+    cfg.sampler.batch_size = args.bs
 
     data = torch.load(cfg.sampler.ckpt_path, map_location="cpu")
     if cfg.sampler.use_ema:
