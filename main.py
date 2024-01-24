@@ -65,7 +65,7 @@ def main(args):
     else:
         raise NotImplementedError(f'{model_cfg.model_type} is not surportted !')
     
-    ldm = LatentDiffusion(
+    model = LatentDiffusion(
         model=unet,
         auto_encoder=first_stage_model,
         train_sample=model_cfg.train_sample,
@@ -87,12 +87,27 @@ def main(args):
         use_l1=model_cfg.get('use_l1', True),
         cfg=model_cfg,
     )
-    ldm.eval().cuda()
+
+    if cfg.sampler.use_ema:
+        sd = data['ema']
+        new_sd = {}
+        for k in sd.keys():
+            if k.startswith("ema_model."):
+                new_k = k[10:]  # remove ema_model.
+                new_sd[new_k] = sd[k]
+        sd = new_sd
+        model.load_state_dict(sd)
+    else:
+        model.load_state_dict(data['model'])
+    if 'scale_factor' in data['model']:
+        model.scale_factor = data['model']['scale_factor']
+
+    model.eval().cuda()
     image = Image.open("/content/input.png").convert("RGB")
     image = rearrange(torch.from_numpy(np.array(image)), "h w c -> 1 c h w").float() / 255.
     image = normalize_to_neg_one_to_one(image)
     image = image.cuda()
-    return sample(ldm, image, cfg, batch_size=cfg.sampler.batch_size)
+    return sample(model, image, cfg, batch_size=cfg.sampler.batch_size)
 
 def sample(model, image, cfg, batch_size=8):
     mask = None
