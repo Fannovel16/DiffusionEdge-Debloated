@@ -93,6 +93,7 @@ def main(args):
     return sample(ldm, image, cfg, batch_size=cfg.sampler.batch_size)
 
 def sample(model, image, cfg, batch_size=8):
+    mask = None
     if cfg.sampler.sample_type == 'whole':
         batch_pred = whole_sample(model, image, raw_size=image.shape[2:], mask=mask)
     elif cfg.sampler.sample_type == 'slide':
