@@ -89,8 +89,8 @@ def main(args):
     )
     ldm.eval().cuda()
     image = Image.open("/content/input.png").convert("RGB")
-    image = rearrange(torch.from_numpy(np.array(image)), "h w c -> 1 c h w").float() / 255.
-    #image = normalize_to_neg_one_to_one(image)
+    image = rearrange(torch.from_numpy(np.array(image)), "h w c -> c h w").float() / 255.
+    image = normalize_to_neg_one_to_one(image)
     image = image.cuda()
     return sample(ldm, image, cfg, batch_size=cfg.sampler.batch_size)
 
