@@ -114,6 +114,7 @@ class DiffusionEdge:
     def to(self, device):
         self.model.to(device)
         self.device = device
+        return self
         
     def __call__(self, image, batch_size):
         image = normalize_to_neg_one_to_one(image).to(self.device)
