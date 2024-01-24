@@ -102,7 +102,7 @@ def sample(model, image, cfg, batch_size=8):
         batch_pred = slide_sample(model, image, crop_size=cfg.sampler.get('crop_size', [320, 320]),
                                         stride=cfg.sampler.stride, mask=mask, bs=batch_size)
     print(batch_pred.shape)
-    tv.utils.save_image(batch_pred[0], "/content/result.png")
+    tv.utils.save_image(batch_pred, "/content/result.png")
 
 def whole_sample(model, inputs, raw_size, mask=None):
     inputs = F.interpolate(inputs, size=(416, 416), mode='bilinear', align_corners=True)
