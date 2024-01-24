@@ -26,6 +26,8 @@ def parse_args():
     parser.add_argument("--pre_weight", help='path of pretrained weight', type=str, required=True)
     parser.add_argument("--sampling_timesteps", help='sampling timesteps', type=int, default=1)
     parser.add_argument("--bs", help='batch_size for inference', type=int, default=8)
+    parser.add_argument("--input_image", '-i', type=str, required=True)
+    parser.add_argument("--output_image", '-o', type=str, required=True)
     args = parser.parse_args()
     args.cfg = load_conf(args.cfg)
     return args
@@ -106,13 +108,13 @@ def main(args):
         model.scale_factor = data['model']['scale_factor']
 
     model.eval().cuda()
-    image = Image.open("/content/input.png").convert("RGB")
+    image = Image.open(args.input_image).convert("RGB")
     image = rearrange(torch.from_numpy(np.array(image)), "h w c -> 1 c h w").float() / 255.
     image = normalize_to_neg_one_to_one(image)
     image = image.cuda()
-    return sample(model, image, cfg, batch_size=cfg.sampler.batch_size)
+    return sample(model, image, args.output_image, cfg, batch_size=cfg.sampler.batch_size)
 
-def sample(model, image, cfg, batch_size=8):
+def sample(model, image, out_path, cfg, batch_size=8):
     mask = None
     if cfg.sampler.sample_type == 'whole':
         batch_pred = whole_sample(model, image, raw_size=image.shape[2:], mask=mask)
