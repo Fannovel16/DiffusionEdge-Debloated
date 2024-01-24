@@ -32,104 +32,105 @@ def parse_args():
     args.cfg = load_conf(args.cfg)
     return args
 
-def main(args):
-    cfg = CfgNode(args.cfg)
-    torch.manual_seed(42)
-    np.random.seed(42)
-    model_cfg = cfg.model
-    first_stage_cfg = model_cfg.first_stage
-    first_stage_model = AutoencoderKL(
-        ddconfig=first_stage_cfg.ddconfig,
-        lossconfig=first_stage_cfg.lossconfig,
-        embed_dim=first_stage_cfg.embed_dim,
-        ckpt_path=first_stage_cfg.ckpt_path,
-    )
-    if model_cfg.model_name == 'cond_unet':
-        from denoising_diffusion_pytorch.mask_cond_unet import Unet
-        unet_cfg = model_cfg.unet
-        unet = Unet(dim=unet_cfg.dim,
-                    channels=unet_cfg.channels,
-                    dim_mults=unet_cfg.dim_mults,
-                    learned_variance=unet_cfg.get('learned_variance', False),
-                    out_mul=unet_cfg.out_mul,
-                    cond_in_dim=unet_cfg.cond_in_dim,
-                    cond_dim=unet_cfg.cond_dim,
-                    cond_dim_mults=unet_cfg.cond_dim_mults,
-                    window_sizes1=unet_cfg.window_sizes1,
-                    window_sizes2=unet_cfg.window_sizes2,
-                    fourier_scale=unet_cfg.fourier_scale,
-                    cfg=unet_cfg,
-                    )
-    else:
-        raise NotImplementedError
-    if model_cfg.model_type == 'const_sde':
-        from denoising_diffusion_pytorch.ddm_const_sde import LatentDiffusion
-    else:
-        raise NotImplementedError(f'{model_cfg.model_type} is not surportted !')
+class DiffusionEdge:
+    def __init__(self, args) -> None:
+        self.cfg = CfgNode(args.cfg)
+        torch.manual_seed(42)
+        np.random.seed(42)
+        model_cfg = self.cfg.model
+        first_stage_cfg = model_cfg.first_stage
+        first_stage_model = AutoencoderKL(
+            ddconfig=first_stage_cfg.ddconfig,
+            lossconfig=first_stage_cfg.lossconfig,
+            embed_dim=first_stage_cfg.embed_dim,
+            ckpt_path=first_stage_cfg.ckpt_path,
+        )
+        if model_cfg.model_name == 'cond_unet':
+            from denoising_diffusion_pytorch.mask_cond_unet import Unet
+            unet_cfg = model_cfg.unet
+            unet = Unet(dim=unet_cfg.dim,
+                        channels=unet_cfg.channels,
+                        dim_mults=unet_cfg.dim_mults,
+                        learned_variance=unet_cfg.get('learned_variance', False),
+                        out_mul=unet_cfg.out_mul,
+                        cond_in_dim=unet_cfg.cond_in_dim,
+                        cond_dim=unet_cfg.cond_dim,
+                        cond_dim_mults=unet_cfg.cond_dim_mults,
+                        window_sizes1=unet_cfg.window_sizes1,
+                        window_sizes2=unet_cfg.window_sizes2,
+                        fourier_scale=unet_cfg.fourier_scale,
+                        cfg=unet_cfg,
+                        )
+        else:
+            raise NotImplementedError
+        if model_cfg.model_type == 'const_sde':
+            from denoising_diffusion_pytorch.ddm_const_sde import LatentDiffusion
+        else:
+            raise NotImplementedError(f'{model_cfg.model_type} is not surportted !')
+        
+        self.model = LatentDiffusion(
+            model=unet,
+            auto_encoder=first_stage_model,
+            train_sample=model_cfg.train_sample,
+            image_size=model_cfg.image_size,
+            timesteps=model_cfg.timesteps,
+            sampling_timesteps=args.sampling_timesteps,
+            loss_type=model_cfg.loss_type,
+            objective=model_cfg.objective,
+            scale_factor=model_cfg.scale_factor,
+            scale_by_std=model_cfg.scale_by_std,
+            scale_by_softsign=model_cfg.scale_by_softsign,
+            default_scale=model_cfg.get('default_scale', False),
+            input_keys=model_cfg.input_keys,
+            ckpt_path=model_cfg.ckpt_path,
+            ignore_keys=model_cfg.ignore_keys,
+            only_model=model_cfg.only_model,
+            start_dist=model_cfg.start_dist,
+            perceptual_weight=model_cfg.perceptual_weight,
+            use_l1=model_cfg.get('use_l1', True),
+            cfg=model_cfg,
+        )
+        self.cfg.sampler.ckpt_path = args.pre_weight
+        self.cfg.sampler.batch_size = args.bs
+
+        data = torch.load(self.cfg.sampler.ckpt_path, map_location="cpu")
+        if self.cfg.sampler.use_ema:
+            sd = data['ema']
+            new_sd = {}
+            for k in sd.keys():
+                if k.startswith("ema_model."):
+                    new_k = k[10:]  # remove ema_model.
+                    new_sd[new_k] = sd[k]
+            sd = new_sd
+            self.model.load_state_dict(sd)
+        else:
+            self.model.load_state_dict(data['model'])
+        if 'scale_factor' in data['model']:
+            self.model.scale_factor = data['model']['scale_factor']
+
+        self.model.eval()
+        self.device = "cpu"
     
-    model = LatentDiffusion(
-        model=unet,
-        auto_encoder=first_stage_model,
-        train_sample=model_cfg.train_sample,
-        image_size=model_cfg.image_size,
-        timesteps=model_cfg.timesteps,
-        sampling_timesteps=args.sampling_timesteps,
-        loss_type=model_cfg.loss_type,
-        objective=model_cfg.objective,
-        scale_factor=model_cfg.scale_factor,
-        scale_by_std=model_cfg.scale_by_std,
-        scale_by_softsign=model_cfg.scale_by_softsign,
-        default_scale=model_cfg.get('default_scale', False),
-        input_keys=model_cfg.input_keys,
-        ckpt_path=model_cfg.ckpt_path,
-        ignore_keys=model_cfg.ignore_keys,
-        only_model=model_cfg.only_model,
-        start_dist=model_cfg.start_dist,
-        perceptual_weight=model_cfg.perceptual_weight,
-        use_l1=model_cfg.get('use_l1', True),
-        cfg=model_cfg,
-    )
-    cfg.sampler.ckpt_path = args.pre_weight
-    cfg.sampler.batch_size = args.bs
+    def to(self, device):
+        self.model.to(device)
+        self.device = device
+        
+    def __call__(self, image, batch_size):
+        image = normalize_to_neg_one_to_one(image).to(self.device)
+        mask = None
+        if self.cfg.sampler.sample_type == 'whole':
+            return self.whole_sample(image, raw_size=image.shape[2:], mask=mask)
+        elif self.cfg.sampler.sample_type == 'slide':
+            return self.slide_sample(image, crop_size=self.cfg.sampler.get('crop_size', [320, 320]),
+                                            stride=self.cfg.sampler.stride, mask=mask, bs=batch_size)
+    
+    def whole_sample(self, inputs, raw_size, mask=None):
+        inputs = F.interpolate(inputs, size=(416, 416), mode='bilinear', align_corners=True)
+        seg_logits = self.model.sample(batch_size=inputs.shape[0], cond=inputs, mask=mask)
+        seg_logits = F.interpolate(seg_logits, size=raw_size, mode='bilinear', align_corners=True)
+        return seg_logits
 
-    data = torch.load(cfg.sampler.ckpt_path, map_location="cpu")
-    if cfg.sampler.use_ema:
-        sd = data['ema']
-        new_sd = {}
-        for k in sd.keys():
-            if k.startswith("ema_model."):
-                new_k = k[10:]  # remove ema_model.
-                new_sd[new_k] = sd[k]
-        sd = new_sd
-        model.load_state_dict(sd)
-    else:
-        model.load_state_dict(data['model'])
-    if 'scale_factor' in data['model']:
-        model.scale_factor = data['model']['scale_factor']
-
-    model.eval().cuda()
-    image = Image.open(args.input_image).convert("RGB")
-    image = rearrange(torch.from_numpy(np.array(image)), "h w c -> 1 c h w").float() / 255.
-    image = normalize_to_neg_one_to_one(image)
-    image = image.cuda()
-    return sample(model, image, args.output_image, cfg, batch_size=cfg.sampler.batch_size)
-
-def sample(model, image, out_path, cfg, batch_size=8):
-    mask = None
-    if cfg.sampler.sample_type == 'whole':
-        batch_pred = whole_sample(model, image, raw_size=image.shape[2:], mask=mask)
-    elif cfg.sampler.sample_type == 'slide':
-        batch_pred = slide_sample(model, image, crop_size=cfg.sampler.get('crop_size', [320, 320]),
-                                        stride=cfg.sampler.stride, mask=mask, bs=batch_size)
-    tv.utils.save_image(1 - batch_pred, "/content/result.png")
-
-def whole_sample(model, inputs, raw_size, mask=None):
-    inputs = F.interpolate(inputs, size=(416, 416), mode='bilinear', align_corners=True)
-    seg_logits = model.sample(batch_size=inputs.shape[0], cond=inputs, mask=mask)
-    seg_logits = F.interpolate(seg_logits, size=raw_size, mode='bilinear', align_corners=True)
-    return seg_logits
-
-def slide_sample(model, inputs, crop_size, stride, mask=None, bs=8):
+    def slide_sample(self, inputs, crop_size, stride, mask=None, bs=8):
         """Inference by sliding-window with overlap.
 
         If h_crop > h_img or w_crop > w_img, the small patch will be used to
@@ -189,7 +190,7 @@ def slide_sample(model, inputs, crop_size, stride, mask=None, bs=8):
             else:
                 crop_imgs_temp = crop_imgs[bs * i:bs * (i + 1), ...]
 
-            crop_seg_logits = model.sample(batch_size=crop_imgs_temp.shape[0], cond=crop_imgs_temp, mask=mask)
+            crop_seg_logits = self.model.sample(batch_size=crop_imgs_temp.shape[0], cond=crop_imgs_temp, mask=mask)
             crop_seg_logits_list.append(crop_seg_logits)
         crop_seg_logits = torch.cat(crop_seg_logits_list, dim=0)
         for crop_seg_logit, x1, x2, y1, y2 in zip(crop_seg_logits, x1s, x2s, y1s, y2s):
@@ -204,4 +205,7 @@ def slide_sample(model, inputs, crop_size, stride, mask=None, bs=8):
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args)
+    model = DiffusionEdge(args).to("cuda")
+    image = np.array(Image.open(args.input_image).convert("RGB"))
+    image = rearrange(torch.from_numpy(image), "h w c -> 1 c h w").float() / 255.
+    tv.utils.save_image(model(image), args.output_image)

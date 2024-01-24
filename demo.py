@@ -5,7 +5,6 @@ import math
 import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
-from ema_pytorch import EMA
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from torch.utils.tensorboard import SummaryWriter
 from denoising_diffusion_pytorch.utils import *
