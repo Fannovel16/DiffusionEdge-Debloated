@@ -88,7 +88,7 @@ def main(args):
         cfg=model_cfg,
     )
     image = Image.open("/content/input.png").convert("RGB")
-    image = rearrange(torch.from_numpy(image), "h w c -> 1 c h w")
+    image = rearrange(torch.from_numpy(np.array(image)), "h w c -> 1 c h w")
     image = normalize_to_neg_one_to_one(image)
     return sample(ldm, image, cfg, batch_size=cfg.sampler.batch_size)
 
