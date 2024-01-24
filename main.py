@@ -22,7 +22,7 @@ def load_conf(config_file, conf={}):
     return conf
 def parse_args():
     parser = argparse.ArgumentParser(description="demo configure")
-    parser.add_argument("--cfg", help="experiment configure file name", type=str, default="./configs/default.yaml")
+    parser.add_argument("--cfg", help="experiment configure file name", type=str, default="./default.yaml")
     parser.add_argument("--pre_weight", help='path of pretrained weight', type=str, required=True)
     parser.add_argument("--sampling_timesteps", help='sampling timesteps', type=int, default=1)
     parser.add_argument("--bs", help='batch_size for inference', type=int, default=8)
