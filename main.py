@@ -116,7 +116,7 @@ class DiffusionEdge:
         self.device = device
         return self
         
-    def __call__(self, image, batch_size):
+    def __call__(self, image, batch_size=8):
         image = normalize_to_neg_one_to_one(image).to(self.device)
         mask = None
         if self.cfg.sampler.sample_type == 'whole':
