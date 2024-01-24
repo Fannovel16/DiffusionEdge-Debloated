@@ -87,7 +87,7 @@ def main(args):
         use_l1=model_cfg.get('use_l1', True),
         cfg=model_cfg,
     )
-
+    data = torch.load(cfg.sampler.ckpt_path, map_location="cpu")
     if cfg.sampler.use_ema:
         sd = data['ema']
         new_sd = {}
